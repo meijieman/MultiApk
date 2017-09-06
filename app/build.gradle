@@ -1,0 +1,135 @@
+apply plugin: 'com.android.application'
+
+def VER_NAME = '1.0'
+def VER_CODE = 1
+
+// ---读取 local.properties 配置-----------------------------------
+def keystoreFilepath = ''
+def keystorePSW = ''
+def keystoreAlias = ''
+def keystoreAliasPSW = ''
+// def keystore file, PLZ config file path in local.properties
+def keyfile = file('s.keystore.temp')
+
+Properties prop = new Properties()
+prop.load(project.rootProject.file('local.properties').newDataInputStream())
+keystoreFilepath = prop.getProperty('keystore.path')
+if (keystoreFilepath) {
+    keystorePSW = prop.getProperty('keystore.pwd')
+    keystoreAlias = prop.getProperty('keystore.alias')
+    keystoreAliasPSW = prop.getProperty('keystore.alias_pwd')
+    keyfile = prop.getProperty(keystoreFilepath)
+}
+// ---读取 local.properties 配置-----------------------------------
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion "25.0.0"
+    defaultConfig {
+        applicationId "com.major.multiapk"
+        minSdkVersion 19
+        targetSdkVersion 25
+        versionCode VER_CODE
+        versionName VER_NAME
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "boolean", "AUTO_UPDATES", "false"
+
+    }
+
+    signingConfigs {
+        release {
+            keyAlias keystoreAlias
+            keyPassword keystorePSW
+            storePassword keystoreAliasPSW
+//            storeFile keyfile // 读取文件有问题 http://www.cnblogs.com/details-666/p/keystore.html
+            storeFile file('../config/multiapk.jks')
+        }
+    }
+
+
+    buildTypes {
+        release {
+            minifyEnabled true //开启混淆
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+//            signingConfig signingConfigs.config
+
+//            if (keyfile.exists()) {
+//                println("WITH -> buildTypes -> release: using jks key")
+            signingConfig signingConfigs.release
+//            } else {
+//                println("WITH -> buildTypes -> release: using default key")
+//            }
+
+            debuggable false
+
+            manifestPlaceholders = [baiduMapKey: "1234"]
+            buildConfigField 'String', 'moreInfo', MORE_INFO
+
+        }
+
+        debug {
+            minifyEnabled false
+            debuggable true
+
+
+            manifestPlaceholders = [baiduMapKey: "5678"]
+        }
+    }
+
+    productFlavors {
+        prod {
+            applicationId 'com.major.multiapk'
+            versionName '1.0-product'
+
+            buildConfigField "boolean", "AUTO_UPDATES", "true"
+
+        }
+        preprod {
+            applicationId 'preprod.com.major.multiapk'
+            versionName '1.0-uat'
+        }
+        uat {
+            applicationId 'uat.com.major.multiapk'
+            versionName '1.0-uat'
+        }
+    }
+
+    // apk命名规则为：[appName][versionName]-[flavorName]-[date].apk
+//修改生成的apk名字
+    applicationVariants.all { variant ->
+
+        if (variant.buildType.name.equals('release')) {
+            variant.outputs.each { output ->
+                def appName = 'MyApp'
+                def oldFile = output.outputFile
+                def buildName
+                def releaseApkName
+
+                variant.productFlavors.each { product ->
+                    buildName = product.name
+                }
+
+                releaseApkName = appName + 'v' + versionName + '-' + buildName + '-' + getDate() + '.apk'
+
+                output.outputFile = new File(oldFile.parent, releaseApkName)
+            }
+        }
+    }
+
+}
+
+//获取时间戳
+def getDate() {
+    return new Date().format('yyyyMMddHHmm')
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:25.3.1'
+    compile 'com.android.support.constraint:constraint-layout:1.0.0-alpha7'
+    testCompile 'junit:junit:4.12'
+}
